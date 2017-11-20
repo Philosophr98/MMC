@@ -14,7 +14,8 @@ from matplotlib.pyplot import specgram
 
 from sklearn import svm
 
-#######################################  feature extraction      ################################################
+#########################################################################################  feature extraction    ########################################################################################
+
 def extract_feature(clip_name):
     A, sample_rate = librosa.load(clip_name)
     stft = np.abs(librosa.stft(A))
@@ -28,7 +29,8 @@ def extract_feature(clip_name):
 
 
 
-#######################              parses all the audio files in specified folder and calls the feature extraction function       #####################################################
+##########################################            parses all the audio files in specified folder and calls the feature extraction function       ####################################################
+
 def parse_through_files(parent_fold,sub_folds,file_ext="*.wav"):
     features, labels = np.empty((0,193)), np.empty(0)
     for label, sub_fold in enumerate(sub_folds):
@@ -53,7 +55,7 @@ test_features, test_labels = parse_through_files(parent_fold,test_sub_folds)
 
 
 
-###########################################         SVM           ######################################################
+#########################################################################################        SVM           ##########################################################################################
 
 clf=svm.SVC(decision_function_shape='ovo')
 clf.fit(train_features,train_labels)
@@ -66,7 +68,8 @@ print(test_labels)
 
 
 
-##########################################         K-nearest neighbours    ##################################################
+#################################################################################       K-nearest neighbours    #########################################################################################
+
 from sklearn.neighbors import KNeighborsClassifier
 knn = KNeighborsClassifier(n_neighbors=1)
 knn.fit(train_features,train_labels)
@@ -74,3 +77,59 @@ knn.fit(train_features,train_labels)
 
 knn.predict(test_features)
 print(test_labels)
+
+
+
+#################################################################### Test label data modification for Multilabel Classification  ########################################################################
+
+tmp = np.zeros((19,3))
+print(tmp.shape)
+tmp = tmp.astype(int)
+for i in range(len(train_labels)):
+    tmp[i][train_labels[i]] = 1
+
+
+
+###################################################################################      Multilabel Classifier     ######################################################################################
+
+from skmultilearn.problem_transform import ClassifierChain
+classifier = ClassifierChain(svm.SVC(decision_function_shape='ovo'))
+classifier.fit(train_features,tmp)
+
+p=classifier.predict(test_features)
+print(p)
+
+
+
+from skmultilearn.adapt import MLkNN
+clsfr= MLkNN(k=1)
+clsfr.fit(train_features,tmp)
+
+p=clsfr.predict(test_features)
+print(p)
+
+
+###########################################################################      Search for videos with similar tags   ##################################################################################
+
+import urllib
+from bs4 import BeautifulSoup
+d={}
+d[0]="cheering"
+d[1]="music"
+d[2]="speech"
+p=p.todense()
+print(p)
+for tup in p:
+    tupp = np.matrix(tup).tolist()[0]
+    for i in range(len(tupp)):
+        if tupp[i] == 0: continue;
+        textToSearch = d[i]
+        query = urllib.parse.quote(textToSearch)
+        url = "https://www.youtube.com/results?search_query=" + query
+        response = urllib.request.urlopen(url)
+        html = response.read()
+        soup = BeautifulSoup(html,"lxml")
+        for vid in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
+            print ('https://www.youtube.com' + vid['href'])
+        print('next class')
+    print('next file')
